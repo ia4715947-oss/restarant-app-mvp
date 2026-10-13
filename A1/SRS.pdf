@@ -1,0 +1,116 @@
+1. INTRODUCTION*
+
+*1.1 Purpose*
+This document defines requirements for Restaurant App MVP v1.0, a frontend-only React Native prototype. Intended audience is course instructor, developers, and testers. This document covers only client-side implementation without any backend, API, or payment gateway. It guides implementation of Questions 3-10 using React hooks: useState, useEffect, useRef, useContext, useReducer, useMemo, useCallback, and custom hooks.
+
+*1.2 Scope*
+*IN SCOPE for initial version:*
+1. User authentication via mock data (Login/Signup with Customer/Manager roles)
+2. Menu browsing with categories (Starters, Mains, Desserts, Drinks) - 15 items
+3. Search, filter, sort, and pull-to-refresh on menu
+4. Cart management with quantity stepper, notes, promo codes WELCOME10 and FEAST20
+5. Table reservation with slot availability check (12:00 to 22:00)
+6. Order placement (Dine-in with table / Takeaway with pickup time) and order tracking with status lifecycle
+7. Manager dashboard for orders, reservations, menu management
+8. Theme toggle (light/dark), profile screen, AsyncStorage persistence
+
+*OUT OF SCOPE:*
+- Real backend, Firebase, REST APIs, any database
+- Real payments, Stripe, JazzCash
+- Push notifications
+- GPS tracking, maps
+- Real-time chat
+
+*1.3 Definitions and Acronyms*
+- SRS: Software Requirements Specification
+- MVP: Minimum Viable Product - first version with core features
+- UML: Unified Modeling Language - diagrams to model system
+- Hook: React function like useState, useEffect to use state in functional components
+- Context: React API to share global state (Auth, Theme, Cart) without prop drilling
+- Reducer: Pure function (state, action) => newState used with useReducer for complex state
+- Mock Data: Local JSON/JS files simulating backend (users.js, http://menu.js)
+- FlatList: React Native component for efficient scrollable lists
+- AsyncStorage: Local key-value storage for persisting data on device
+- Navigation Stack: React Navigation structure for moving between screens
+
+*2. OVERALL DESCRIPTION*
+
+*2.1 User Roles*
+*Role: Customer (Diner)*
+Permissions: Browse menu, search, add to cart, apply promo, reserve table, place order, track order, toggle theme, logout.
+Goal: Quickly order food and book table without waiting in queue.
+
+*Role: Restaurant Manager*
+Permissions: View incoming orders and change status manually, accept/decline reservations, add/edit menu items, toggle availability.
+Goal: Digitize menu and manage orders/reservations efficiently from phone.
+
+*2.2 User Stories - Self Interview as Customer*
+1. As a Customer (self-interview), I want to view daily specials with a badge, so that I can try chef's special dishes quickly.
+2. As a Customer (self-interview), I want to filter menu by category chips (Starters, Mains), so that I find food in one tap.
+3. As a Customer (self-interview), I want to search dishes with debounce, so that results appear without lag while typing.
+4. As a Customer (self-interview), I want to see if a dish is unavailable greyed out, so that I don't order out-of-stock items.
+5. As a Customer (self-interview), I want to reserve a table for 7:00 PM with party size, so that my food is ready when I arrive.
+6. As a Customer, I want to add special instructions like "no onions" per item, so that my order is customized.
+7. As a Customer, I want to apply promo code WELCOME10, so that I get discount.
+8. As a Customer, I want to track my order status Pending->Preparing->Ready->Served with timer, so that I know when to pickup.
+9. As a Restaurant Manager, I want to accept or decline reservations, so that I control table occupancy.
+10. As a Restaurant Manager, I want to change order status manually, so that customer sees real kitchen progress.
+11. As a Restaurant Manager, I want to add new menu item and toggle availability, so that menu stays updated instantly.
+12. As a User, I want to toggle light/dark theme from profile, so that I can use app comfortably at night.
+
+*3. FUNCTIONAL REQUIREMENTS*
+
+FR-01: The system shall allow user to switch between Login and Signup mode using a mode state variable.
+FR-02: The system shall validate email format and password (min 8 chars, at least 1 digit) on submit and matching confirm password.
+FR-03: The system shall authenticate against mock users array in src/data/users.js and simulate 1 second network delay with ActivityIndicator.
+FR-04: The system shall navigate Customer to Menu screen and Manager to Dashboard after successful login and store user in AuthContext.
+FR-05: The system shall fetch menu items from local Promise after 1.5 seconds with loading indicator and error with Retry button.
+FR-06: The system shall display horizontal category chips and filter FlatList based on selected category.
+FR-07: The system shall show Daily Special badge for isSpecial=true and grey out unavailable items with Add button disabled.
+FR-08: The system shall support pull-to-refresh to reload menu data.
+FR-09: The system shall provide search bar with TextInput ref focus on icon tap and 400ms debounced search using useRef for timeout.
+FR-10: The system shall show Back-to-Top floating button after scroll >300px using FlatList ref scrollToOffset.
+FR-11: The system shall store last 5 search terms and show as tappable suggestions when input focused and empty.
+FR-12: The system shall allow Add to Cart, Remove, Increment, Decrement (remove when quantity 0) via cartReducer.
+FR-13: The system shall allow special instructions per cart item via UPDATE_NOTE action.
+FR-14: The system shall apply promo codes WELCOME10 (10%) and FEAST20 (20%) and reject invalid codes with error.
+FR-15: The system shall offer hourly time slots from 12:00 to 22:00 and disable slot when no table with enough seats is free.
+FR-16: The system shall validate reservation: date not in past, party size 1-12, phone 03XX-XXXXXXX format, booking at least 1 hour ahead.
+FR-17: The system shall show confirmation modal summarising booking before saving and allow cancellation after Alert confirmation.
+FR-18: The system shall create order with id, items, total, type (Dine-in/Takeaway), status Pending, timestamp on Place Order.
+FR-19: The system shall auto-progress order status Pending->Preparing after 10s->Ready after 20s->Served after 30s using setInterval and clear interval in cleanup.
+FR-20: The system shall allow Manager to view incoming orders, manually change status, accept/decline reservations, add/edit price/toggle availability and reflect instantly on customer menu.
+FR-21: The system shall persist orders, reservations, menu edits in AsyncStorage and load them on app start with loading screen.
+FR-22: The system shall toggle light/dark theme globally via ThemeContext and apply to all screens.
+
+*4. NON-FUNCTIONAL REQUIREMENTS*
+Usability: App shall have bottom tabs with icons, safe area handling, friendly empty state when no search results, validation errors clear on edit. Touch targets min 44px.
+Performance: Menu load within 1.5s mock delay, FlatList shall use keyExtractor for smooth 60fps scroll. Search debounce 400ms.
+Responsiveness: UI shall adapt to screen sizes 4.7 inch to 6.7 inch using Flexbox. Cards wrap correctly.
+Maintainability: Code shall follow folder structure src/components, screens, context, reducers, hooks, data, navigation. Reusable components. No Redux.
+Data Handling (No Backend): All data stored as local JS files and React state. No external API. AsyncStorage only for persistence.
+
+*5. CLIENT-SIDE DATA MODEL (Mock Data)*
+Users: {id, name, email, password, role: 'customer'|'manager'}
+Categories: {id, name, icon}
+MenuItems: {id, name, description, price, category, image, isSpecial, isAvailable, prepTime}
+Tables: {id, tableNumber, capacity, isAvailable}
+Reservations: {id, userId, date: YYYY-MM-DD, timeSlot: '19:00', partySize, tableId, name, phone, status: 'pending'|'accepted'|'declined'}
+Orders: {id, userId, items: [{menuItemId, quantity, note}], subtotal, serviceCharge, tax, discount, total, type: 'dine-in'|'takeaway', tableId, status, createdAt}
+
+*6. UML DIAGRAMS (Placeholders)*
+Figure 1: Use Case Diagram - Shows Customer and Manager actors with 12+ use cases. Include: Place Order includes Apply Promo Code. Extend: Search extends Browse Menu.
+Figure 2: Class Diagram - User base class, Customer and Manager inherit User, associations: Customer 1-_ Order, Order 1-_ CartItem, MenuItem _-1 Category, Reservation _-1 Table.
+Figure 3: Sequence Diagram - Customer taps Add to Cart -> CartContext dispatch ADD_ITEM -> Place Order -> OrdersContext create order -> TrackingScreen interval updates.
+Figure 4: State Machine - Order states: Pending -(accept)-> Preparing -(cooked)-> Ready -(delivered)-> Served, any -(cancel)-> Cancelled.
+Figure 5: Component Diagram - App -> Providers (Auth, Theme, Cart, Orders) -> Navigation (Tabs+Stacks) -> Screens -> Components + Hooks + Reducers.
+
+*7. MVP FRONTEND DEVELOPMENT*
+7.1 Login and Signup: Purpose auth. UI: email, password, name, confirm, role selector, show toggle, errors, submit. Navigation: entry app launch, exit to Menu/Dashboard. Data: http://users.js. Hooks: useState for form, errors, isSubmitting, mode.
+7.2 Menu Browsing: Purpose display menu. UI: chips, FlatList cards, badge, loader, retry. Data: http://menu.js. Hooks: useState menuItems/filtered, useEffect load and filter, cleanup timer.
+7.3 Search and Scroll: Purpose fast search. UI: search bar, clear, Back-to-Top FAB, render counter, recent searches. Hooks: useRef for TextInput, FlatList, timeoutId, prevQuery.
+7.4 Profile and Theme: Purpose user info and theme. UI: name, email, role, switch, logout. Data: AuthContext. Hooks: useContext useAuth, useTheme.
+7.5 Cart: Purpose manage cart. UI: list with stepper +/-, note input, remove, promo input, badge. Data: CartContext. Hooks: useReducer.
+7.6 Order Summary: Purpose bill. UI: subtotal, 5% service, 15% tax, discount, total, sort. Hooks: useMemo for totals and filtered+sorted, useCallback for handlers, http://React.memo.
+7.7 Table Reservation: Purpose book table. UI: date picker, time slots grid disabled, party size, phone, My Reservations list. Hooks: custom useForm, useDebounce, useReservation.
+7.8 Order Tracking and Manager Dashboard: Purpose track and manage. UI: stepper progress, elapsed timer, Manager tabs: Orders status buttons, Reservations accept/decline, Menu edit. Hooks: useEffect intervals + AsyncStorage.
